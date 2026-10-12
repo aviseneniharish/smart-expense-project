@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Expenses - Smart Expense Management{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Manage Expense Records</h1>
+    <p class="page-subtitle">View, filter, and delete your recorded expenses.</p>
+  </div>
+  <a href="{{ url_for('add_expense') }}" class="btn btn-primary">+ Add New Expense</a>
+</div>
+
+<!-- Category Filter and Table Summary Bar -->
+<div class="card filter-bar">
+  <form action="{{ url_for('view_expenses') }}" method="GET" class="filter-form">
+    <div class="filter-group">
+      <label for="category-filter" class="form-label-inline">Filter by Category:</label>
+      <select id="category-filter" name="category" class="form-control form-control-sm" onchange="this.form.submit()">
+        <option value="">-- All Categories --</option>
+        {% for cat in categories %}
+          <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>
+            {{ cat }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    {% if selected_category %}
+      <a href="{{ url_for('view_expenses') }}" class="btn btn-outline btn-sm">Clear Filter</a>
+    {% endif %}
+  </form>
+
+  <div class="filter-summary">
+    <span>Showing <strong>{{ total_count }}</strong> record(s)</span>
+    <span class="divider">|</span>
+    <span>Total: <strong>{{ total_amount | currency }}</strong></span>
+  </div>
+</div>
+
+<!-- Expenses Table -->
+<div class="card" style="margin-top: 16px;">
+  {% if expenses %}
+    <div class="table-responsive">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width: 50px;">#</th>
+            <th style="width: 120px;">Date</th>
+            <th style="width: 140px;">Category</th>
+            <th>Description</th>
+            <th style="width: 130px;" class="text-right">Amount (₹)</th>
+            <th style="width: 90px;" class="text-center">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in expenses %}
+            <tr>
+              <td class="text-muted">{{ loop.index }}</td>
+              <td><span class="date-badge">{{ item.date }}</span></td>
+              <td><span class="category-badge cat-{{ item.category|lower }}">{{ item.category }}</span></td>
+              <td class="expense-desc">{{ item.description }}</td>
+              <td class="text-right amount-col"><strong>{{ item.amount | currency }}</strong></td>
+              <td class="text-center">
+                <form action="{{ url_for('delete_expense', expense_id=item.id) }}" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this expense: &quot;{{ item.description }}&quot;?');">
+                  <button type="submit" class="btn-delete" title="Delete Expense">&times; Delete</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="table-summary-row">
+            <td colspan="4" class="text-right"><strong>Subtotal:</strong></td>
+            <td class="text-right"><strong>{{ total_amount | currency }}</strong></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">📂</div>
+      <h3>No expenses found</h3>
+      <p class="text-muted">
+        {% if selected_category %}
+          No expenses recorded under the category "<strong>{{ selected_category }}</strong>".
+        {% else %}
+          Your expense ledger is currently empty. Start logging your daily student expenses.
+        {% endif %}
+      </p>
+      <div style="margin-top: 12px;">
+        <a href="{{ url_for('add_expense') }}" class="btn btn-primary btn-sm">+ Add Your First Expense</a>
+        {% if selected_category %}
+          <a href="{{ url_for('view_expenses') }}" class="btn btn-outline btn-sm">View All Categories</a>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

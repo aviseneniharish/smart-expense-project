@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+
+{% block title %}Financial Analytics - Smart Expense Management{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Financial Analytics & Spending Trends</h1>
+    <p class="page-subtitle">Visual analysis of your category distributions and monthly spending patterns.</p>
+  </div>
+  <a href="{{ url_for('view_expenses') }}" class="btn btn-outline">&larr; View Expense Table</a>
+</div>
+
+<!-- Analytics Top Summary KPI Cards -->
+<div class="metrics-grid">
+  <div class="card metric-card">
+    <div class="metric-label">Total Expenditure</div>
+    <div class="metric-value">{{ summary.total_spent | currency }}</div>
+    <div class="metric-sub">Sum of all {{ summary.total_transactions }} transactions</div>
+  </div>
+
+  <div class="card metric-card">
+    <div class="metric-label">Top Spending Category</div>
+    <div class="metric-value metric-value-sm">{{ summary.highest_category }}</div>
+    <div class="metric-sub">
+      {% if summary.highest_category != 'None' %}
+        {{ summary.highest_category_amount | currency }} ({{ summary.highest_category_percent }}%)
+      {% else %}
+        N/A
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card metric-card">
+    <div class="metric-label">Current Month ({{ summary.current_month_name }})</div>
+    <div class="metric-value">{{ summary.current_month_spent | currency }}</div>
+    <div class="metric-sub">
+      {% if summary.monthly_budget > 0 %}
+        {{ summary.budget_usage_percent }}% of monthly budget
+      {% else %}
+        Budget not configured
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card metric-card">
+    <div class="metric-label">Active Categories</div>
+    <div class="metric-value">{{ summary.sorted_categories | length }}</div>
+    <div class="metric-sub">Categories with recorded spends</div>
+  </div>
+</div>
+
+{% if summary.total_transactions > 0 %}
+  <!-- Charts Section (2-Column Grid) -->
+  <div class="grid-2col" style="margin-top: 24px;">
+    <!-- Chart 1: Category Distribution Doughnut -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Category Spending Distribution</h2>
+        <span class="badge badge-info">Doughnut Chart</span>
+      </div>
+      <p class="text-muted text-sm">Proportional breakdown of your expenses across categories.</p>
+      <div class="chart-wrapper">
+        <canvas id="categoryChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Chart 2: Monthly Spending Trend Bar Chart -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Monthly Spending Trend</h2>
+        <span class="badge badge-info">Bar Chart</span>
+      </div>
+      <p class="text-muted text-sm">Total expenses recorded per calendar month.</p>
+      <div class="chart-wrapper">
+        <canvas id="monthlyChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detailed Tabular Breakdowns -->
+  <div class="grid-2col" style="margin-top: 24px;">
+    <!-- Category Breakdown Table -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Category-Wise Breakdown</h2>
+      </div>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th class="text-right">Total Spent (₹)</th>
+              <th class="text-right">Share (%)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for cat, amount in summary.sorted_categories %}
+              <tr>
+                <td><span class="category-badge cat-{{ cat|lower }}">{{ cat }}</span></td>
+                <td class="text-right"><strong>{{ amount | currency }}</strong></td>
+                <td class="text-right">
+                  {% if summary.total_spent > 0 %}
+                    {{ ((amount / summary.total_spent) * 100) | round(1) }}%
+                  {% else %}
+                    0%
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Monthly Spending Breakdown Table -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">Monthly Expense Totals</h2>
+      </div>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th class="text-right">Total Spent (₹)</th>
+              <th class="text-right">Share of Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m_key, m_val in summary.sorted_monthly_totals %}
+              <tr>
+                <td><strong>{{ m_key }}</strong></td>
+                <td class="text-right"><strong>{{ m_val | currency }}</strong></td>
+                <td class="text-right">
+                  {% if summary.total_spent > 0 %}
+                    {{ ((m_val / summary.total_spent) * 100) | round(1) }}%
+                  {% else %}
+                    0%
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+{% else %}
+  <div class="card" style="margin-top: 24px;">
+    <div class="empty-state">
+      <div class="empty-icon">📊</div>
+      <h3>No Financial Analytics Available</h3>
+      <p class="text-muted">You have not recorded any expenses yet. Add expenses to generate charts and category breakdowns.</p>
+      <div style="margin-top: 15px;">
+        <a href="{{ url_for('add_expense') }}" class="btn btn-primary btn-sm">+ Add New Expense</a>
+      </div>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if summary.total_transactions > 0 %}
+<!-- Load Chart.js from CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script>
+  // Safe JSON data passed from Flask Python backend
+  const categoryLabels = {{ category_labels_json | safe }};
+  const categoryValues = {{ category_values_json | safe }};
+  const monthlyLabels = {{ monthly_labels_json | safe }};
+  const monthlyValues = {{ monthly_values_json | safe }};
+
+  // Color palette suited for clean academic project
+  const chartColors = [
+    '#2563eb', // Blue
+    '#10b981', // Green
+    '#f59e0b', // Amber
+    '#8b5cf6', // Purple
+    '#ef4444', // Red
+    '#06b6d4', // Cyan
+    '#ec4899', // Pink
+    '#64748b'  // Slate
+  ];
+
+  // 1. Category Doughnut Chart
+  const categoryCtx = document.getElementById('categoryChart');
+  if (categoryCtx && categoryLabels.length > 0) {
+    new Chart(categoryCtx, {
+      type: 'doughnut',
+      data: {
+        labels: categoryLabels,
+        datasets: [{
+          data: categoryValues,
+          backgroundColor: chartColors.slice(0, categoryLabels.length),
+          borderColor: '#ffffff',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { boxWidth: 12, font: { size: 12 } }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const val = context.raw || 0;
+                return ' ' + context.label + ': ₹' + Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // 2. Monthly Trend Bar Chart
+  const monthlyCtx = document.getElementById('monthlyChart');
+  if (monthlyCtx && monthlyLabels.length > 0) {
+    new Chart(monthlyCtx, {
+      type: 'bar',
+      data: {
+        labels: monthlyLabels,
+        datasets: [{
+          label: 'Total Spent (₹)',
+          data: monthlyValues,
+          backgroundColor: '#3b82f6',
+          borderRadius: 4,
+          maxBarThickness: 45
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                return '₹' + Number(value).toLocaleString('en-IN');
+              }
+            },
+            grid: { color: '#f1f5f9' }
+          },
+          x: {
+            grid: { display: false }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const val = context.raw || 0;
+                return ' Spending: ₹' + Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+</script>
+{% endif %}
+{% endblock %}

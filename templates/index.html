@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Smart Expense Management{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Dashboard Overview</h1>
+    <p class="page-subtitle">Track your daily college spending, monthly budget, and personal finances.</p>
+  </div>
+  <div class="header-actions">
+    <a href="{{ url_for('add_expense') }}" class="btn btn-primary">+ Add New Expense</a>
+    <a href="{{ url_for('view_expenses') }}" class="btn btn-outline">View All Expenses</a>
+  </div>
+</div>
+
+<!-- Key Financial Metrics Cards -->
+<div class="metrics-grid">
+  <div class="card metric-card">
+    <div class="metric-label">Total Expenses (All Time)</div>
+    <div class="metric-value">{{ summary.total_spent | currency }}</div>
+    <div class="metric-sub">Across all logged records</div>
+  </div>
+
+  <div class="card metric-card">
+    <div class="metric-label">This Month ({{ summary.current_month_name }})</div>
+    <div class="metric-value">{{ summary.current_month_spent | currency }}</div>
+    <div class="metric-sub">Current active month spending</div>
+  </div>
+
+  <div class="card metric-card">
+    <div class="metric-label">Total Transactions</div>
+    <div class="metric-value">{{ summary.total_transactions }}</div>
+    <div class="metric-sub">Recorded expense entries</div>
+  </div>
+
+  <div class="card metric-card">
+    <div class="metric-label">Top Spending Category</div>
+    <div class="metric-value metric-value-sm">{{ summary.highest_category }}</div>
+    <div class="metric-sub">
+      {% if summary.highest_category != 'None' %}
+        {{ summary.highest_category_amount | currency }} ({{ summary.highest_category_percent }}%)
+      {% else %}
+        No expenses yet
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Two Column Layout: Budget & Financial Insights -->
+<div class="grid-2col">
+  <!-- Monthly Budget Status Card -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Monthly Budget Status</h2>
+      <span class="badge {% if summary.is_budget_exceeded %}badge-danger{% elif summary.budget_usage_percent >= 80 %}badge-warning{% else %}badge-success{% endif %}">
+        {% if summary.monthly_budget == 0 %}Not Set{% elif summary.is_budget_exceeded %}Exceeded{% else %}On Track{% endif %}
+      </span>
+    </div>
+
+    {% if summary.monthly_budget > 0 %}
+      <div class="budget-summary-box">
+        <div class="budget-row">
+          <span>Monthly Limit:</span>
+          <strong>{{ summary.monthly_budget | currency }}</strong>
+        </div>
+        <div class="budget-row">
+          <span>Spent in {{ summary.current_month_name }}:</span>
+          <strong>{{ summary.current_month_spent | currency }}</strong>
+        </div>
+        <div class="budget-row">
+          <span>Remaining Balance:</span>
+          <strong class="{% if summary.remaining_budget < 0 %}text-danger{% else %}text-success{% endif %}">
+            {{ summary.remaining_budget | currency }}
+          </strong>
+        </div>
+      </div>
+
+      <!-- Budget Progress Bar -->
+      <div class="progress-bar-container">
+        <div class="progress-labels">
+          <span>Usage: {{ summary.budget_usage_percent }}%</span>
+          <span>{% if summary.remaining_budget >= 0 %}{{ (100 - summary.budget_usage_percent) | round(1) }}% left{% else %}Limit exceeded{% endif %}</span>
+        </div>
+        <div class="progress-track">
+          <div 
+            class="progress-fill {% if summary.is_budget_exceeded %}fill-danger{% elif summary.budget_usage_percent >= 80 %}fill-warning{% else %}fill-success{% endif %}"
+            style="width: {{ [summary.budget_usage_percent, 100]|min }}%;"
+          ></div>
+        </div>
+      </div>
+
+      {% if summary.is_budget_exceeded %}
+        <div class="inline-alert alert-danger">
+          ⚠️ <strong>Budget Exceeded:</strong> You have spent {{ (summary.current_month_spent - summary.monthly_budget) | currency }} above your monthly limit!
+        </div>
+      {% endif %}
+    {% else %}
+      <p class="text-muted">No monthly budget has been defined yet. Set a target limit below to monitor your spending pace.</p>
+    {% endif %}
+
+    <!-- Form to update Monthly Budget -->
+    <form action="{{ url_for('set_budget') }}" method="POST" class="budget-form">
+      <label for="monthly_budget" class="form-label">Set / Update Monthly Budget (₹):</label>
+      <div class="input-group">
+        <input 
+          type="number" 
+          id="monthly_budget" 
+          name="monthly_budget" 
+          step="100" 
+          min="0" 
+          placeholder="e.g. 8000" 
+          value="{{ summary.monthly_budget if summary.monthly_budget > 0 else '' }}" 
+          required 
+          class="form-control"
+        >
+        <button type="submit" class="btn btn-primary btn-sm">Save Budget</button>
+      </div>
+      <small class="form-hint">Tip: Useful for tracking student allowances, hostel fees, and monthly expense caps.</small>
+    </form>
+  </div>
+
+  <!-- Rule-based Financial Insights Card -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Smart Financial Insights</h2>
+      <span class="badge badge-info">Rule-Based</span>
+    </div>
+    <p class="text-muted text-sm">Automated analysis generated from your spending habits and budget thresholds:</p>
+
+    <div class="insights-list">
+      {% for insight in summary.insights %}
+        <div class="insight-item insight-{{ insight.type }}">
+          <div class="insight-title">{{ insight.title }}</div>
+          <div class="insight-body">{{ insight.message }}</div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div style="margin-top: 15px; text-align: right;">
+      <a href="{{ url_for('analytics') }}" class="link-action">View Full Analytics & Charts &rarr;</a>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Transactions Section -->
+<div class="card" style="margin-top: 24px;">
+  <div class="card-header">
+    <div>
+      <h2 class="card-title">Recent Transactions</h2>
+      <p class="text-muted text-sm">Showing up to 5 most recent expense entries</p>
+    </div>
+    <a href="{{ url_for('view_expenses') }}" class="btn btn-outline btn-sm">Manage All Expenses</a>
+  </div>
+
+  {% if recent_expenses %}
+    <div class="table-responsive">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Category</th>
+            <th>Description</th>
+            <th class="text-right">Amount (₹)</th>
+            <th class="text-center">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in recent_expenses %}
+            <tr>
+              <td><span class="date-badge">{{ item.date }}</span></td>
+              <td><span class="category-badge cat-{{ item.category|lower }}">{{ item.category }}</span></td>
+              <td>{{ item.description }}</td>
+              <td class="text-right"><strong>{{ item.amount | currency }}</strong></td>
+              <td class="text-center">
+                <form action="{{ url_for('delete_expense', expense_id=item.id) }}" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this expense: &quot;{{ item.description }}&quot;?');">
+                  <button type="submit" class="btn-delete" title="Delete Expense">&times; Delete</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty-state">
+      <p>No expenses found. Click below to add your first expense record.</p>
+      <a href="{{ url_for('add_expense') }}" class="btn btn-primary btn-sm">+ Add First Expense</a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

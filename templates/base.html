@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Smart Expense Management and Financial Analytics System{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+  <!-- Top Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="{{ url_for('dashboard') }}" class="nav-brand">
+        <span class="brand-icon">₹</span>
+        <span class="brand-text">Smart Expense</span>
+      </a>
+
+      <nav class="nav-links">
+        <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a>
+        <a href="{{ url_for('view_expenses') }}" class="{% if request.endpoint == 'view_expenses' %}active{% endif %}">Expenses</a>
+        <a href="{{ url_for('add_expense') }}" class="{% if request.endpoint == 'add_expense' %}active{% endif %}">+ Add Expense</a>
+        <a href="{{ url_for('analytics') }}" class="{% if request.endpoint == 'analytics' %}active{% endif %}">Analytics</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Flash Notification Messages -->
+  <main class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-messages">
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">
+              <span>{{ message }}</span>
+              <button type="button" class="close-alert" onclick="this.parentElement.remove();">&times;</button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Simple Student-Made Footer -->
+  <footer class="footer">
+    <div class="footer-container">
+      <p><strong>Smart Expense Management and Financial Analytics System</strong></p>
+      <p class="footer-sub">B.Tech CSE College Micro-Project | Python & Flask with CSV Storage</p>
+    </div>
+  </footer>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>
